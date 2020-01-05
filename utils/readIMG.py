@@ -16,7 +16,7 @@ class readIMG():
     pass
     self.cimg = None
   
-  def ReadCIMG(self, filepath):
+  def read(self, filepath):
     try:
       self.cimg = cv2.imread(filepath) #1: color, 0: gray
       if self.cimg is None:
@@ -25,9 +25,9 @@ class readIMG():
       echeck.error_print(e)
       exit(-1)
 
-   
+
   
-  def ShowIMG(self):
+  def _show(self):
     from matplotlib import pyplot as plt
     img = cv2.cvtColor(self.cimg, cv2.COLOR_BGR2RGB)
     plt.imshow(img)
@@ -38,5 +38,5 @@ class readIMG():
 if __name__ == "__main__":
   file_path = './testdata/lena.jpeg'
   img = readIMG()
-  img.ReadCIMG(file_path)
-  img.ShowIMG()
+  img.read(file_path)
+  img._show()
