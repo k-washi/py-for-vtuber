@@ -80,6 +80,9 @@ class handDetector():
     return bboxes, slist
   
   def handOpenDtector(self, mask):
+    #開き具合と開いた指の数を計算
+    #指の数２以下をクローズ、3以上をオープンと認識したら安定する。
+    
     #findcontours 輪郭抽出
     contours,hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -98,19 +101,19 @@ class handDetector():
       areacnt = cv2.contourArea(cnt) #凸を考慮しない面積
       arearatio=((areahull-areacnt)/areacnt)*100
 
-      """
+      
       approx= cv2.approxPolyDP(cnt,epsilon,True) #少ない点数に近似
-      hull = cv2.convexHull(approx, returnPoints=False)
+      hull = cv2.convexHull(approx, returnPoints=False) #returnPoints 凸検出False
       defects = cv2.convexityDefects(approx, hull)
-
-      print("area ratio")
-      print(arearatio)
 
       #print("def")
       #print(defects)
       l = 0
       if defects is None:
-        return mask
+        return arearatio, None
+
+      #http://labs.eecs.tottori-u.ac.jp/sd/Member/oyamada/OpenCV/html/py_tutorials/py_imgproc/py_contours/py_contours_more_functions/py_contours_more_functions.html
+
       for i in range(defects.shape[0]):
         s,e,f,d = defects[i,0]
         start = tuple(approx[s][0])
@@ -118,29 +121,25 @@ class handDetector():
         far = tuple(approx[f][0])
         pt= (100,180)
         
+        fingerL = math.sqrt((end[0] - start[0])**2 + (end[1] - start[1])**2) #指の間の距離
+        hullL1 = math.sqrt((far[0] - start[0])**2 + (far[1] - start[1])**2) #指１の長さ
+        hullL2 = math.sqrt((end[0] - far[0])**2 + (end[1] - far[1])**2) #指２の長さ
+        s = (fingerL+hullL1+hullL2)/2
+        ar = math.sqrt(s*(s-fingerL)*(s-hullL1)*(s-hullL2)) #ヘロンの公式
         
-        # find length of all sides of triangle
-        a = math.sqrt((end[0] - start[0])**2 + (end[1] - start[1])**2)
-        b = math.sqrt((far[0] - start[0])**2 + (far[1] - start[1])**2)
-        c = math.sqrt((end[0] - far[0])**2 + (end[1] - far[1])**2)
-        s = (a+b+c)/2
-        ar = math.sqrt(s*(s-a)*(s-b)*(s-c))
+        d=(2*ar)/fingerL #凸の長さ
         
-        #distance between point and convex hull
-        d=(2*ar)/a
-        
-        # apply cosine rule here
-        angle = math.acos((b**2 + c**2 - a**2)/(2*b*c)) * 57
-        
-    
-        # ignore angles > 90 and ignore points very close to convex hull(they generally come due to noise)
+        #余弦定理
+        angle = math.acos((hullL1**2 + hullL2**2 - fingerL**2)/(2*hullL1*hullL2)) * 180. /np.pi
+  
+        #無理な角度は無視
         if angle <= 90 and d>30:
             l += 1
-
-
-    print(l)
-    """
-    return arearatio
+        
+      if l >= 1:
+        l += 1
+    
+    return arearatio, l
 
    
 
@@ -209,7 +208,9 @@ if __name__ == "__main__":
       if tfs[i]:
 
         handMask = fd.hsvSkinMasking(hsv_frame, box[0], box[1], box[2], box[3])
-        handOpenRatio = hd.handOpenDtector(handMask)
+        handOpenRatio, finger_Num = hd.handOpenDtector(handMask)
+        print(handOpenRatio)
+        print(finger_Num)
 
         print(handOpenRatio)
         rect = patches.Rectangle((box[0], box[1]), box[2], box[3], fill=False)
