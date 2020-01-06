@@ -11,7 +11,7 @@ import cv2
 from imutils import face_utils
 
 #-----------
-from detector.trackering import trackingCV
+from detector.tracking import trackingCV
 
 DLIB_MODEL_PATH = './model/shape_predictor_68_face_landmarks.dat'
 

@@ -14,54 +14,51 @@ import tensorflow as tf
 import numpy as np
 
 #-----
-from detector.trackering import trackingCV
+from detector.tracking import handTracker
 
 detection_graph = tf.Graph()
 _score_thresh = 0.3
 
 MODEL_ROOT = './model'
 PATH_TO_CKPT = os.path.join(MODEL_ROOT,  'frozen_inference_graph.pb')
-PATH_TO_LABEL = os.path.join(MODEL_ROOT, 'hand_label_map.pbtxt')
 
 NUM_CLASS = 1
 
 class handDetector():
   def __init__(self):
-    super().__init__()
+    self.detection_graph = None
+    self.sess = None
 
 
   def load_inference_graph(self):
     # load frozen tensorflow model into memory
     print("> ====== loading HAND frozen graph into memory")
-    detection_graph = tf.Graph()
-    with detection_graph.as_default():
+    self.detection_graph = tf.Graph()
+    with self.detection_graph.as_default():
         od_graph_def = tf.GraphDef()
         with tf.gfile.GFile(PATH_TO_CKPT, 'rb') as fid:
             serialized_graph = fid.read()
             od_graph_def.ParseFromString(serialized_graph)
             tf.import_graph_def(od_graph_def, name='')
-        sess = tf.Session(graph=detection_graph)
+        self.sess = tf.Session(graph=self.detection_graph)
     print(">  ====== Hand Inference graph loaded.")
-    return detection_graph, sess
+    
 
-  def detect_objects(self, image_np, detection_graph, sess):
-    # Definite input and output Tensors for detection_graph
-    image_tensor = detection_graph.get_tensor_by_name('image_tensor:0')
-    # Each box represents a part of the image where a particular object was detected.
-    detection_boxes = detection_graph.get_tensor_by_name(
+  def detect_objects(self, image_np):
+    image_tensor = self.detection_graph.get_tensor_by_name('image_tensor:0')
+    
+    detection_boxes = self.detection_graph.get_tensor_by_name(
         'detection_boxes:0')
-    # Each score represent how level of confidence for each of the objects.
-    # Score is shown on the result image, together with the class label.
-    detection_scores = detection_graph.get_tensor_by_name(
+    detection_scores = self.detection_graph.get_tensor_by_name(
         'detection_scores:0')
-    detection_classes = detection_graph.get_tensor_by_name(
+    detection_classes = self.detection_graph.get_tensor_by_name(
         'detection_classes:0')
-    num_detections = detection_graph.get_tensor_by_name(
+    num_detections = self.detection_graph.get_tensor_by_name(
         'num_detections:0')
 
     image_np_expanded = np.expand_dims(image_np, axis=0)
 
-    (boxes, scores, classes, num) = sess.run(
+    (boxes, scores, classes, num) = self.sess.run(
         [detection_boxes, detection_scores,
             detection_classes, num_detections],
         feed_dict={image_tensor: image_np_expanded})
@@ -88,24 +85,72 @@ if __name__ == "__main__":
   from utils.captureVideo import cpatureVideo
   import cv2
 
+
+
   hd = handDetector()
+  ht = handTracker()
+
   fd = cpatureVideo(WIDTH=640, HEIGHT=480)
   WIDTH, HEIGHT = fd.get_size()
 
   fig, ax = plt.subplots()
-  detection_graph, sess = hd.load_inference_graph()
-  print("Capture")
+  hd.load_inference_graph()
+  
 
   while True:
+  
+
     rgb_frame = fd.read()
-    print(np.shape(rgb_frame))
-    boxes, scores = hd.detect_objects(rgb_frame, detection_graph, sess)
+    hsv_frame = fd.rgb2hsv(rgb_frame)
+    boxes, scores = hd.detect_objects(rgb_frame)
     boxes, slist = hd.score_Classifier(boxes, scores, WIDTH, HEIGHT)
-    print(boxes)
-    print(slist)
+    #print(boxes, scores)
+    mask = hsv_frame
+
+    overlap = False
+    counter = 0
+    old_bbox = (0, 0, 0, 0)
     for box in boxes:
-      rect = patches.Rectangle((box[0], box[1]), box[2], box[3], fill=False)
-      ax.add_patch(rect)
+
+      counter += 1
+
+      if counter == 1:
+        overlap = False
+        old_bbox = (box[0], box[1], box[2], box[3])
+
+        
+      elif counter >= 2:
+        if old_bbox[0] < box[0] + box[2]/2 and box[0] + box[2]/2 < old_bbox[0] + old_bbox[2]:
+          overlap = True
+        else:
+          overlap = False
+        
+      
+      if not overlap:
+        
+        overlap = True
+        #rect = patches.Rectangle((box[0], box[1]), box[2], box[3], fill=False)
+        #ax.add_patch(rect)
+        ht.setTrackingBox(rgb_frame, box[0], box[1], box[2], box[3])
+
+        
+
+      if counter >= 2:
+        
+        break
+      
+      
+
+    tfs, bboxes = ht.trackings(rgb_frame)
+    #print(tfs)
+    for tf, box in zip(tfs, boxes):
+      if tf:
+        #h, s, v = fd.hsvExtraction(hsv_frame, box[0], box[1], box[2], box[3])
+        print(box)
+        mask = fd.hsvMasking(hsv_frame, box[0], box[1], box[2], box[3])
+
+        rect = patches.Rectangle((box[0], box[1]), box[2], box[3], fill=False)
+        ax.add_patch(rect)
 
     plt.imshow(rgb_frame)
     plt.pause(0.01)
