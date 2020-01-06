@@ -12,12 +12,13 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 import tensorflow as tf
 import numpy as np
+import math
 
 #-----
 from detector.tracking import handTracker
 
 detection_graph = tf.Graph()
-_score_thresh = 0.3
+_score_thresh = 0.5
 
 MODEL_ROOT = './model'
 PATH_TO_CKPT = os.path.join(MODEL_ROOT,  'frozen_inference_graph.pb')
@@ -77,6 +78,71 @@ class handDetector():
         slist.append(score)
     
     return bboxes, slist
+  
+  def handOpenDtector(self, mask):
+    #findcontours 輪郭抽出
+    contours,hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    #max area
+    arearatio = None
+    if len(contours) > 0:
+      cnt = max(contours, key = lambda x: cv2.contourArea(x))
+
+      
+      epsilon = 0.0005*cv2.arcLength(cnt,True) #arcLength 領域の周囲長さ
+      
+
+      #http://labs.eecs.tottori-u.ac.jp/sd/Member/oyamada/OpenCV/html/py_tutorials/py_imgproc/py_contours/py_contour_features/py_contour_features.html
+      hull = cv2.convexHull(cnt)
+      areahull = cv2.contourArea(hull) #凸を考慮した面積
+      areacnt = cv2.contourArea(cnt) #凸を考慮しない面積
+      arearatio=((areahull-areacnt)/areacnt)*100
+
+      """
+      approx= cv2.approxPolyDP(cnt,epsilon,True) #少ない点数に近似
+      hull = cv2.convexHull(approx, returnPoints=False)
+      defects = cv2.convexityDefects(approx, hull)
+
+      print("area ratio")
+      print(arearatio)
+
+      #print("def")
+      #print(defects)
+      l = 0
+      if defects is None:
+        return mask
+      for i in range(defects.shape[0]):
+        s,e,f,d = defects[i,0]
+        start = tuple(approx[s][0])
+        end = tuple(approx[e][0])
+        far = tuple(approx[f][0])
+        pt= (100,180)
+        
+        
+        # find length of all sides of triangle
+        a = math.sqrt((end[0] - start[0])**2 + (end[1] - start[1])**2)
+        b = math.sqrt((far[0] - start[0])**2 + (far[1] - start[1])**2)
+        c = math.sqrt((end[0] - far[0])**2 + (end[1] - far[1])**2)
+        s = (a+b+c)/2
+        ar = math.sqrt(s*(s-a)*(s-b)*(s-c))
+        
+        #distance between point and convex hull
+        d=(2*ar)/a
+        
+        # apply cosine rule here
+        angle = math.acos((b**2 + c**2 - a**2)/(2*b*c)) * 57
+        
+    
+        # ignore angles > 90 and ignore points very close to convex hull(they generally come due to noise)
+        if angle <= 90 and d>30:
+            l += 1
+
+
+    print(l)
+    """
+    return arearatio
+
+   
 
 
 if __name__ == "__main__":
@@ -88,7 +154,7 @@ if __name__ == "__main__":
 
 
   hd = handDetector()
-  ht = handTracker()
+  ht = handTracker(kcf=True)
 
   fd = cpatureVideo(WIDTH=640, HEIGHT=480)
   WIDTH, HEIGHT = fd.get_size()
@@ -102,9 +168,10 @@ if __name__ == "__main__":
 
     rgb_frame = fd.read()
     hsv_frame = fd.rgb2hsv(rgb_frame)
+
     boxes, scores = hd.detect_objects(rgb_frame)
     boxes, slist = hd.score_Classifier(boxes, scores, WIDTH, HEIGHT)
-    #print(boxes, scores)
+
     mask = hsv_frame
 
     overlap = False
@@ -118,22 +185,18 @@ if __name__ == "__main__":
         overlap = False
         old_bbox = (box[0], box[1], box[2], box[3])
 
-        
       elif counter >= 2:
         if old_bbox[0] < box[0] + box[2]/2 and box[0] + box[2]/2 < old_bbox[0] + old_bbox[2]:
           overlap = True
         else:
           overlap = False
         
-      
       if not overlap:
         
         overlap = True
-        #rect = patches.Rectangle((box[0], box[1]), box[2], box[3], fill=False)
-        #ax.add_patch(rect)
-        ht.setTrackingBox(rgb_frame, box[0], box[1], box[2], box[3])
-
-        
+        rect = patches.Rectangle((box[0], box[1]), box[2], box[3], fill=False)
+        ax.add_patch(rect)
+        ht.setTrackingBox(hsv_frame, box[0], box[1], box[2], box[3])
 
       if counter >= 2:
         
@@ -141,18 +204,18 @@ if __name__ == "__main__":
       
       
 
-    tfs, bboxes = ht.trackings(rgb_frame)
-    #print(tfs)
-    for tf, box in zip(tfs, boxes):
-      if tf:
-        #h, s, v = fd.hsvExtraction(hsv_frame, box[0], box[1], box[2], box[3])
-        print(box)
-        mask = fd.hsvMasking(hsv_frame, box[0], box[1], box[2], box[3])
+    tfs, boxes = ht.trackings(hsv_frame)
+    for i, box in enumerate(boxes):
+      if tfs[i]:
 
+        handMask = fd.hsvSkinMasking(hsv_frame, box[0], box[1], box[2], box[3])
+        handOpenRatio = hd.handOpenDtector(handMask)
+
+        print(handOpenRatio)
         rect = patches.Rectangle((box[0], box[1]), box[2], box[3], fill=False)
         ax.add_patch(rect)
 
-    plt.imshow(rgb_frame)
+    plt.imshow(mask)
     plt.pause(0.01)
     plt.cla()
 

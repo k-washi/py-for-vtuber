@@ -3,13 +3,17 @@ import cv2
 HAND_NUM = 2
 
 class trackingCV():
-  def __init__(self):
+  def __init__(self, kcf = False):
+    self.kcf = kcf
     self.cv_tracker_set()
 
   def cv_tracker_set(self):
-    self.tracker = cv2.TrackerKCF_create()
+    #self.tracker = cv2.TrackerKCF_create()
     #self.tracker = cv2.TrackerMIL_create()
-    #self.tracker = cv2.TrackerMOSSE_create()
+    if self.kcf:
+      self.tracker = cv2.TrackerKCF_create()
+    else:
+      self.tracker = cv2.TrackerMOSSE_create()
 
   def tracker_init(self, frame, left, top, width, height):
     self.cv_tracker_set()
@@ -31,17 +35,19 @@ class trackingCV():
 
 
 class handTracker():
-  def __init__(self):
+  def __init__(self, kcf = False):
     self.ht = []
+    self.kcf = kcf
+
     for _ in range(HAND_NUM):
       self.setHandDetector()
-
+    
     self.left = 0
     self.right = 1
 
 
   def setHandDetector(self):
-    self.ht.append(trackingCV())
+    self.ht.append(trackingCV(self.kcf))
   
   def setTrackingBox(self, frame, left, top, width, height, headPosW = None):
     
@@ -51,11 +57,11 @@ class handTracker():
     if headPosW is None:
       if left + width / 2 < w / 2:
         #right hand
-        print("right hand")
+        #print("right hand")
         self.ht[self.right].tracker_init(frame, left, top, width, height)
       else:
         #left hand
-        print("left hand")
+        #print("left hand")
         self.ht[self.left].tracker_init(frame, left, top, width, height)
 
     else:

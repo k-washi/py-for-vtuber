@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 
+
 dilate_kernel = np.ones((3,3), np.uint8)
 
 class cpatureVideo():
@@ -45,31 +46,56 @@ class cpatureVideo():
     return cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
   
   def hsvExtraction(self, frame, left, top, w, h, bp = 4):
-    imgBox = frame[int(top + h/2 - h/bp) :int(top+h/2 + h/bp), int(left + w/2 - w/bp):int(left+w/2 + w/bp)]
+    l, r, t, b = self.boxTF(left, top, w, h)
+    imgBox = frame[t:b, l:r]
     hc = imgBox.T[0].flatten().mean()
     s = imgBox.T[1].flatten().mean()
     v = imgBox.T[2].flatten().mean()
     #print(h, s, v)
     return hc, s, v
+  
+  def boxTF(self, left, top, w, h, bp = 2):
+    #return left, right, top, bottm
+    leftIdx = int(left + w / 2 - w/bp)
+    if leftIdx < 0:
+      leftIdx = 0
 
-  def hsvMasking(self, frame, left, top, width, height, hw = 20, sw = 15, vw = 30, dilate_iter = 4, bp = 2):
+    topIdx = int(top + h/2 - h/bp) 
+    if topIdx < 0:
+      topIdx = 0
+
+    rightIdx = int(left + w / 2 + w/bp)
+    if rightIdx > self.WIDTH:
+      rightIdx = self.WIDTH
+    
+    bottomIdx = int(top + h/2 + h/bp)
+    if bottomIdx > self.HEIGHT:
+      bottomIdx = self.HEIGHT
+    
+    return leftIdx, rightIdx, topIdx, bottomIdx
+    
+
+
+  def hsvSkinMasking(self, frame, left, top, width, height, hw = 15, sw = 90, vw = 90, dilate_iter = 4, bp = 1):
     h, s, v = self.hsvExtraction(frame, left, top, width, height)
-    lower_skin = np.array((h - hw, s - sw, v - vw), dtype=np.uint8)
-    upper_skin = np.array((h + hw, s + sw, v + vw), dtype=np.uint8)
+    #lower_skin = np.array((h - hw, s - sw, v - vw), dtype=np.uint8)
+    #upper_skin = np.array((h + hw, s + sw, v + vw), dtype=np.uint8)
 
-    mframe = frame[int(top + height/2 - height/bp) :int(top+height/2 + height/bp), 
-                      int(left + width/2 - width/bp):int(left+width/2 + width/bp)]
+    lower_skin = np.array([0,20,70], dtype=np.uint8)
+    upper_skin = np.array([20,255,255], dtype=np.uint8)
 
+    l, r, t, b = self.boxTF(left, top, width, height, bp = bp)
+   
+    mframe = frame[t:b, l:r]
+
+    #mframe = frame[int(top):int(top + height), int(left):int(left + width)]
     mask = cv2.inRange(mframe, lower_skin, upper_skin)
+    mask = cv2.erode(mask, dilate_kernel, iterations=dilate_iter)
 
     mask = cv2.dilate(mask, dilate_kernel, iterations=dilate_iter) #dilate 膨張
 
     mask = cv2.GaussianBlur(mask, (5, 5), 100)
 
-    
-
-    #findcontours 輪郭抽出
-    #_,contours,hierarchy= cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     return mask
     
   
