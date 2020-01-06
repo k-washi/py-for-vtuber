@@ -5,11 +5,17 @@ class cpatureVideo():
   def __init__(self, WIDTH = 160, HEIGHT = 120, deviceID = 0):
     self.video_capture = cv2.VideoCapture(deviceID)
     self.frame = None
-    self.size_set(WIDTH, HEIGHT)
+    self.HEIGHT = HEIGHT
+    self.WIDTH = WIDTH
+    #self.size_set()
 
-  def size_set(self, WIDTH, HEIGHT):
-    self.video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, WIDTH)
-    self.video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, HEIGHT)
+  """
+  def size_set(self):
+    self.video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, self.WIDTH)
+    self.video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, self.HEIGHT)
+  """
+  def get_size(self):
+    return self.WIDTH, self.HEIGHT
 
   def read(self, rgb = True):
     ret, frame = self.video_capture.read()
@@ -18,13 +24,16 @@ class cpatureVideo():
       if rgb:
         #BGR2RGB
         self.frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        return self.frame
+        return self.resize(self.frame, self.WIDTH, self.HEIGHT)
 
       self.frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-      return self.frame
+      return self.resize(self.frame, self.WIDTH, self.HEIGHT)
     
     return None
   
+  def resize(self,frame, width, height):
+    return cv2.resize(frame, dsize=(width, height))
+
   def rgb2gray(self, frame):
     return cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
   

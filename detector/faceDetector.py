@@ -10,12 +10,14 @@ import dlib
 import cv2
 from imutils import face_utils
 
+#-----------
+from detector.trackering import trackingCV
+
 DLIB_MODEL_PATH = './model/shape_predictor_68_face_landmarks.dat'
 
 class faceDetectorDlib():
   def __init__(self):
     self.dlib_model_set()
-    self.cv_tracker_set()
 
   def dlib_model_set(self, file_path = DLIB_MODEL_PATH):
     self._detector = dlib.get_frontal_face_detector()
@@ -37,19 +39,6 @@ class faceDetectorDlib():
     
     return face, landmark
   
-  def cv_tracker_set(self):
-    #self.tracker = cv2.TrackerKCF_create()
-    #self.tracker = cv2.TrackerMIL_create()
-    self.tracker = cv2.TrackerMOSSE_create()
-
-  def tracker_init(self, frame, left, top, width, height):
-    bbox = (left, top, width, height)
-    #bbox = cv2.selectROI(frame, False)
-    ok = self.tracker.init(frame, bbox)
-
-  def tracking(self, frame):
-    track, bbox = self.tracker.update(frame)
-    return track, bbox #tf, bbox
   
   def _show_landmark(self):
     import matplotlib.pyplot as plt
@@ -57,7 +46,8 @@ class faceDetectorDlib():
     from utils.captureVideo import cpatureVideo
     import cv2
 
-    fd = cpatureVideo()
+    fd = cpatureVideo(WIDTH=320, HEIGHT=160)
+    tracker = trackingCV()
 
     fig, ax = plt.subplots()
 
@@ -74,9 +64,9 @@ class faceDetectorDlib():
         centerw = det.left() + det.width()/2
         centert = det.top() + det.height()/2
         width = det.width()/3
-        self.cv_tracker_set()
+     
         #self.tracker_init(gray_frame, det.left(), det.top(), det.width(), det.height())
-        self.tracker_init(rgb_frame, centerw - width, centert - width, width * 2, width * 2)
+        tracker.tracker_init(rgb_frame, centerw - width, centert - width, width * 2, width * 2)
 
         #ax.add_patch(rect)
         
@@ -85,7 +75,7 @@ class faceDetectorDlib():
           plt.scatter(x, y)
           plt.text(x, y, k)
       
-      track, rect = self.tracking(rgb_frame)
+      track, rect = tracker.tracking(rgb_frame)
       if True:
         if track:
           rect = patches.Rectangle((rect[0], rect[1]), rect[2], rect[3], fill=False)
