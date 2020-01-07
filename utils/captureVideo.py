@@ -28,6 +28,7 @@ class cpatureVideo():
     if ret:
       if rgb:
         #BGR2RGB
+        #print(frame)
         self.frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         return self.resize(self.frame, self.WIDTH, self.HEIGHT)
 
@@ -77,7 +78,7 @@ class cpatureVideo():
 
 
   def hsvSkinMasking(self, frame, left, top, width, height, hw = 15, sw = 90, vw = 90, dilate_iter = 4, bp = 1):
-    h, s, v = self.hsvExtraction(frame, left, top, width, height)
+    #h, s, v = self.hsvExtraction(frame, left, top, width, height)
     #lower_skin = np.array((h - hw, s - sw, v - vw), dtype=np.uint8)
     #upper_skin = np.array((h + hw, s + sw, v + vw), dtype=np.uint8)
 

@@ -80,9 +80,9 @@ class handDetector():
     return bboxes, slist
   
   def handOpenDtector(self, mask):
-    #開き具合と開いた指の数を計算
+    #開き具合(肌が見えている範囲で変わる)と開いた指の数を計算
     #指の数２以下をクローズ、3以上をオープンと認識したら安定する。
-    
+
     #findcontours 輪郭抽出
     contours,hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
