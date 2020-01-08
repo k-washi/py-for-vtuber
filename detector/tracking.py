@@ -34,7 +34,7 @@ class trackingCV():
     
 
 
-class handTracker():
+class handTrackerCV():
   def __init__(self, kcf = False):
     self.ht = []
     self.kcf = kcf
@@ -65,7 +65,7 @@ class handTracker():
         self.ht[self.left].tracker_init(frame, left, top, width, height)
 
     else:
-      if left + width / 2 < headPosW / 2:
+      if left + width / 2 < headPosW:
         #right hand
         self.ht[self.right].tracker_init(frame, left, top, width, height)
       else:

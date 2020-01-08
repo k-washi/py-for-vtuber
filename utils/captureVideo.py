@@ -46,6 +46,10 @@ class cpatureVideo():
   def rgb2hsv(self, frame):
     return cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
   
+  def release(self):
+    self.video_capture.release()
+    cv2.destroyAllWindows()
+  
   def hsvExtraction(self, frame, left, top, w, h, bp = 4):
     l, r, t, b = self.boxTF(left, top, w, h)
     imgBox = frame[t:b, l:r]

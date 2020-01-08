@@ -13,19 +13,20 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import tensorflow as tf
 import numpy as np
 import math
+import cv2
 
 #-----
-from detector.tracking import handTracker
+from detector.tracking import handTrackerCV
 
 detection_graph = tf.Graph()
-_score_thresh = 0.5
+_score_thresh = 0.6
 
 MODEL_ROOT = './model'
 PATH_TO_CKPT = os.path.join(MODEL_ROOT,  'frozen_inference_graph.pb')
 
 NUM_CLASS = 1
 
-class handDetector():
+class handDetectorVtube():
   def __init__(self):
     self.detection_graph = None
     self.sess = None
@@ -88,6 +89,7 @@ class handDetector():
 
     #max area
     arearatio = None
+    l = 0
     if len(contours) > 0:
       cnt = max(contours, key = lambda x: cv2.contourArea(x))
 
@@ -152,8 +154,8 @@ if __name__ == "__main__":
 
 
 
-  hd = handDetector()
-  ht = handTracker(kcf=True)
+  hd = handDetectorVtube()
+  ht = handTrackerCV(kcf=True)
 
   fd = cpatureVideo(WIDTH=640, HEIGHT=480)
   WIDTH, HEIGHT = fd.get_size()

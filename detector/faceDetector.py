@@ -111,8 +111,10 @@ HEAD_POSE_NOISE = 2. #deg
 
 FACE_STD_DIR = np.array([[-63.94196692],[ 51.86835768],[ 69.18373256]]) * np.pi /180.
 
+FACE_CHECK_ANGLE = [-30., 30., -50., 50.]
+FACE_CHECK_SCALE = [0.8, 0.8, 0.8, 0,8]
 
-class faceDetectorDlib():
+class faceDetectorVtuve():
   def __init__(self):
     self.rotation_vector = np.array([[ 0.],[0.],[ 0.]])
     self.dlib_model_set()
@@ -148,6 +150,16 @@ class faceDetectorDlib():
     
     return face, landmark
   
+
+  def faceDetect(self, frame):
+    for i in range(len(FACE_CHECK_ANGLE)):
+      
+      face, landmark = self.transfaceDetector(frame, dangle=FACE_CHECK_ANGLE[i], scale=FACE_CHECK_SCALE[i])
+      if face is not None and landmark is not None:
+        return face, landmark
+    
+    return None, None
+
   def transfaceDetector(self, frame, width= HWIDTH, height = HHEIGHT, centerW = int(HWIDTH/2), centerH = int(HHEIGHT/2), dangle = 50, scale = 0.8):
     
     trans = cv2.getRotationMatrix2D((centerW, centerH), angle=dangle, scale=scale)
@@ -175,6 +187,9 @@ class faceDetectorDlib():
 
     return None, None
   
+  def getFaceCenterLandmark(self, landmark):
+    return landmark[DLIB_CENTER_ID]
+  
   def eyeBlinkDetect(self, landmark):
     #(Real-Time Eye Blink Detection using Facial Landmarks)http://vision.fe.uni-lj.si/cvww2016/proceedings/papers/05.pdf
     #目をつぶったタイミングで目の位置がずれ、性能が低い。(眼鏡が原因??)
@@ -193,6 +208,7 @@ class faceDetectorDlib():
 
     #print(left_eye_blinkP)
     #print(right_eye_blinkP)
+
   
 
   def eyeTracker(self, frame, landmark, left = True):
@@ -281,7 +297,17 @@ class faceDetectorDlib():
     axis = np.array([(0.0, 0.0, 500.0)])
     (nose_end_point2D, jacobian) = cv2.projectPoints(axis, rotation_vector, translation_vector, CAMERA_MATRIX, DIST_COFFEIS)
     return rotation_vector, translation_vector, nose_end_point2D
-  
+
+  def faceDirRange(self, rotVec, rotVecIni, x, y, z):
+    if rotVec[0][0] < -x or x < rotVec[0][0]:
+      rotVec[0][0] = rotVecIni[0][0]
+    if rotVec[1][0] < -y or y < rotVec[1][0]:
+      rotVec[1][0] = rotVecIni[1][0]
+    if rotVec[2][0] < -z or z < rotVec[2][0]:
+      rotVec[2][0] = rotVecIni[2][0]
+    
+    return rotVec
+
   def mouthOpenDetector(self, landmark):
     left = landmark[DLIB_MOUTH_LURB_ID[0]]
     up = landmark[DLIB_MOUTH_LURB_ID[1]]
@@ -443,6 +469,6 @@ class faceDetectorDlib():
     
 
 if __name__ == "__main__":
-  facedet = faceDetectorDlib()
+  facedet = faceDetectorVtuve()
   facedet._show_landmark()
   
