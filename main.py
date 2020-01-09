@@ -213,8 +213,7 @@ if __name__ == "__main__":
         handRPosW, handRPosH = int(handRect[0] + handRect[2]/2), int(handRect[1] + handRect[3]/2)
         if handTrackingFailThTF[i]:
           handVel[i][0], handVel[i][1] = int(handRPosW - handTempPos[i][0]), int(handRPosH - handTempPos[i][1])
-          print("hand {0}".format(handVel))
-          #handTempPos[i][0], handTempPos[i][1] = handRPosW, handRPosH
+      
         #handOpen and finger num counter
         hsv_frame = capVideo.rgb2hsv(frame)
         handMask = capVideo.hsvSkinMasking(hsv_frame, handRect[0], handRect[1], handRect[2], handRect[3])
@@ -239,8 +238,7 @@ if __name__ == "__main__":
     
       if np.linalg.norm(handPos[i] - handTempPos[i]) > Config.MoveOffset:
         handPos = deepcopy(handTempPos)
-    #print(handTrackingFailThTF)
-    print(handPos, handTempPos, handVel, handPosInit)
+
         
 
     #---FPS---
@@ -264,14 +262,14 @@ if __name__ == "__main__":
         plotScreen[:,:,2] = imBool * b
       if faceLandmarkDetectFailureCounter == 0:
         for k, (x,y) in enumerate(faceLandmark):
-          cv2.circle(plotScreen, (int(x), int(y)), 3, (0,0,255), -1)
+          cv2.circle(plotScreen, (int(x), int(y)), 4, (0,0,255), -1)
         if faceNoseProdPos is not None:
           cv2.line(plotScreen, (int(faceLandmark[DLIB_NOSE_ID][0]), int(faceLandmark[DLIB_NOSE_ID][1])),
-                  (int(faceNoseProdPos[0][0][0]), int(faceNoseProdPos[0][0][1])), (255, 0, 0), 5)
+                  (int(faceNoseProdPos[0][0][0]), int(faceNoseProdPos[0][0][1])), (255, 0, 0), 7)
           
       if facetrackingTF:
         cv2.rectangle(plotScreen, (int(faceRect[0]), int(faceRect[1])), 
-                                  (int(faceRect[0] + faceRect[2]), int(faceRect[1] + faceRect[3])), (0, 255, 0))
+                                  (int(faceRect[0] + faceRect[2]), int(faceRect[1] + faceRect[3])), (0, 255, 0),4)
       
       cv2.circle(plotScreen, (facePos[0], facePos[1]), 8, (0, 255, 0), 2)
     
