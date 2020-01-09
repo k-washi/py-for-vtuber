@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 import logging
 import time
+from copy import deepcopy
 
 #---------
 
@@ -16,6 +17,10 @@ logging.basicConfig(level=logging.DEBUG, format=formatter)
 
 FaceTrackerVelAttenuationRate = 0.8
 FaceOriginBackVelAttenuationRate = 0.3
+
+HandTrackerVelAttenuationRate = 0.3
+HandOriginBackVelAttenuationRate = 0.3
+
 
 FPS_CALC_FRAMES = 30
 
@@ -66,6 +71,12 @@ if __name__ == "__main__":
 
   #SSD MODEL LOAD
   handDetector.load_inference_graph()
+
+  handPosInit = [np.array([int(Config.CamWidth/2 + Config.CamWidth/4), int(Config.CamHeight + Config.CamHeight/4)]), 
+                  np.array([int(Config.CamWidth/2 - Config.CamWidth/4), int(Config.CamHeight + Config.CamHeight/4)])]
+  handPos = deepcopy(handPosInit)
+  handTempPos = deepcopy(handPosInit)
+  handVel = [np.array([0, 0]), np.array([0, 0])]
   
   #######
   #-FPS-#
@@ -75,18 +86,24 @@ if __name__ == "__main__":
   nowFPS = 0
   
   
-
+  RECORD_SIZE = (Config.CamWidth, Config.CamHeight)
   if not Config.PlotOK:
     #black Screen
     plotScreen = np.zeros((Config.CamHeight, Config.CamWidth, 3), np.uint8)
+    
+
   else:
     plotNosePoint = None
     faceRect = None
     faceLandmark = None
+    
+    RECORD_SIZE = (int(Config.CamWidth/Config.PlotScaleDiv), int(Config.CamHeight/Config.PlotScaleDiv))
+    if Config.Record:
+      frameRecoder = cv2.VideoWriter(RECORD_PATH, RECORD_FMT, FRAME_RATE, RECORD_SIZE)
 
-  if Config.Record:
-    RECORD_SIZE = (Config.CamWidth, Config.CamHeight)
-    frameRecoder = cv2.VideoWriter(RECORD_PATH, RECORD_FMT, FRAME_RATE, RECORD_SIZE)
+  fingerNumText = "finger no detect"
+  handOpenText = "hand no detect"
+
     
 
   while True:
@@ -140,19 +157,19 @@ if __name__ == "__main__":
           faceTempPos[0], faceTempPos[1] = originBackVelW, originBackVelH
 
     if np.linalg.norm(facePos - faceTempPos) > Config.MoveOffset:
-      facePos = faceTempPos.copy()
-      facePoseRot = faceDetectPoseRot.copy()
+      facePos = deepcopy(faceTempPos)
+      facePoseRot = deepcopy(faceDetectPoseRot)
       
       facePoseRot = faceDetector.faceDirRange(facePoseRot, facePoseRotInit, x=Config.RotXRange, y=Config.RotYRange, z=Config.RotZRange)
 
 
       if plotNosePoint is not None:
-        faceNoseProdPos = plotNosePoint.copy()
+        faceNoseProdPos = deepcopy(plotNosePoint)
         
     if faceLandmarkDetectFailureCounter > Config.FaceLandmarkFailureTh:
       #TODO facePoseRotInitに初期値を与えるようにする。
       #制限
-      facePoseRot = facePoseRotInit.copy()
+      facePoseRot = deepcopy(facePoseRotInit)
     
     
     ###############
@@ -183,17 +200,49 @@ if __name__ == "__main__":
       
       if handCounter >= 2:
         break
-
-    handTrackingTFs, handRects = handTracker.trackings(frame)
+    
+    #handTracker.left => 0
+    #handTracker.right => 1
+    handTrackingTFs, handRects, handTrackingFailThTF = handTracker.trackings(frame)
+    print("HANDTH")
+    print(handTrackingTFs, handRects, handTrackingFailThTF)
     for i, handTrackingTF in enumerate(handTrackingTFs):
       if handTrackingTF:
         handRect = handRects[i]
+        
+        handRPosW, handRPosH = int(handRect[0] + handRect[2]/2), int(handRect[1] + handRect[3]/2)
+        if handTrackingFailThTF[i]:
+          handVel[i][0], handVel[i][1] = int(handRPosW - handTempPos[i][0]), int(handRPosH - handTempPos[i][1])
+          print("hand {0}".format(handVel))
+          #handTempPos[i][0], handTempPos[i][1] = handRPosW, handRPosH
+        #handOpen and finger num counter
         hsv_frame = capVideo.rgb2hsv(frame)
         handMask = capVideo.hsvSkinMasking(hsv_frame, handRect[0], handRect[1], handRect[2], handRect[3])
         handOpenRatio, fingerNum = handDetector.handOpenDtector(handMask)
         handOpenRatios[i] = handOpenRatio
         fingerNums[i] = fingerNum 
+      
+        handTracker.setHandDetectFailCounter(i)
+
+      if handTrackingFailThTF[i]:
+      
+        if handTrackingTF:
+          handTempPos[i][0], handTempPos[i][1] = int(handTempPos[i][0] + handVel[i][0]), int(handTempPos[i][1] + handVel[i][1])
+        else:
+          
+          handVel[i] = handVel[i] * HandTrackerVelAttenuationRate 
+          handTempPos[i][0], handTempPos[i][1] = int(handTempPos[i][0] + handVel[i][0]), int(handTempPos[i][1] + handVel[i][1]) 
+      else:
+        
+        handVel[i][0], handVel[i][1] = int(handPosInit[i][0] - handTempPos[i][0]), int(handPosInit[i][1] - handTempPos[i][1])
+        handTempPos[i][0], handTempPos[i][1] = handTempPos[i][0] + handVel[i][0] * HandOriginBackVelAttenuationRate, handTempPos[i][1] + handVel[i][1]*HandOriginBackVelAttenuationRate
     
+      if np.linalg.norm(handPos[i] - handTempPos[i]) > Config.MoveOffset:
+        handPos = deepcopy(handTempPos)
+    #print(handTrackingFailThTF)
+    print(handPos, handTempPos, handVel, handPosInit)
+        
+
     #---FPS---
 
     fpsCounter += 1
@@ -206,9 +255,13 @@ if __name__ == "__main__":
     #---Plot---
 
     if Config.PlotOK:
-
       plotScreen = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-      plotScreen = cv2.threshold(plotScreen, 127, 255, cv2.THRESH_TOZERO)
+      if Config.PlotBinarization:
+        imBool = cv2.cvtColor(plotScreen, cv2.COLOR_RGB2GRAY) > 128
+        r,g,b = 255, 128, 32
+        plotScreen[:,:,0] = imBool * r
+        plotScreen[:,:,1] = imBool * g
+        plotScreen[:,:,2] = imBool * b
       if faceLandmarkDetectFailureCounter == 0:
         for k, (x,y) in enumerate(faceLandmark):
           cv2.circle(plotScreen, (int(x), int(y)), 3, (0,0,255), -1)
@@ -220,7 +273,7 @@ if __name__ == "__main__":
         cv2.rectangle(plotScreen, (int(faceRect[0]), int(faceRect[1])), 
                                   (int(faceRect[0] + faceRect[2]), int(faceRect[1] + faceRect[3])), (0, 255, 0))
       
-      cv2.circle(plotScreen, (facePos[0], facePos[1]), 5, (0, 255, 0), 2)
+      cv2.circle(plotScreen, (facePos[0], facePos[1]), 8, (0, 255, 0), 2)
     
     #FPS
     fpsText = "FPS: {:.4f}".format(nowFPS)
@@ -241,19 +294,24 @@ if __name__ == "__main__":
     
     textHShift = 0
     for i, handRect in enumerate(handRects):
-      cv2.rectangle(plotScreen, (int(handRect[0]), int(handRect[1])), 
-                                  (int(handRect[0] + handRect[2]), int(handRect[1] + handRect[3])), (0, 255, 0))
-      handCenterW = int(handRect[0] + handRect[2]/2)
-      if handCenterW < facePos[0]:
-        handOpenText = "Right Hand Open Ratio: {:.4f}".format(handOpenRatios[i])
-        fingerNumText = "Right Finger Num: {0}".format(fingerNums[i])
-      else:
-        handOpenText = "Left Hand Open Ratio: {:.4f}".format(handOpenRatios[i])
-        fingerNumText = "Left Finger Num: {0}".format(fingerNums[i])
+      if handTrackingTFs[i]:
+        cv2.rectangle(plotScreen, (int(handRect[0]), int(handRect[1])), 
+                                    (int(handRect[0] + handRect[2]), int(handRect[1] + handRect[3])), (0, 255, 0),5)
+        handCenterW = int(handRect[0] + handRect[2]/2)
+        if handCenterW < facePos[0]:
+          if handOpenRatio is not None:
+            handOpenText = "Right Hand Open Ratio: {:.4f}".format(handOpenRatios[i])
+            fingerNumText = "Right Finger Num: {0}".format(fingerNums[i])
+        else:
+          if handOpenRatio is not None:
+            handOpenText = "Left Hand Open Ratio: {:.4f}".format(handOpenRatios[i])
+            fingerNumText = "Left Finger Num: {0}".format(fingerNums[i])
       
+      cv2.circle(plotScreen, (handPos[i][0], handPos[i][1]), 8, (0, 255, 0), 3)
       cv2.putText(plotScreen, handOpenText, (20, 200 + textHShift), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 4)
       cv2.putText(plotScreen, fingerNumText, (20, 250 + textHShift), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 4)
       textHShift += 100
+    plotScreen = cv2.resize(plotScreen, RECORD_SIZE)
     cv2.imshow("screen", plotScreen)
 
     #record

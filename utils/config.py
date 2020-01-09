@@ -28,6 +28,12 @@ class configInit():
         self.PlotOK = True
       else:
         self.PlotOK = False
+      self.PlotBinarization = int(config_ini["DEFAULT"]["Binarization"])
+      if self.PlotBinarization:
+        self.PlotBinarization = True
+      else:
+        self.PlotBinarization = False
+      self.PlotScaleDiv = int(config_ini["DEFAULT"]["PlotScale"]) 
 
       self.CamWidth = int(config_ini["DEFAULT"]["CamWIDTH"]) 
       self.CamHeight = int(config_ini["DEFAULT"]["CamHEIGHT"]) 
